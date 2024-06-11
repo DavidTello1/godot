@@ -165,6 +165,17 @@
 				Sets camera to use perspective projection. Objects on the screen becomes smaller when they are far away.
 			</description>
 		</method>
+		<method name="camera_set_oblique_plane">
+			<return type="void" />
+			<param index="0" name="camera" type="RID" />
+			<param index="1" name="use_oblique_frustum" type="bool" />
+			<param index="2" name="oblique_normal" type="Vector3" />
+			<param index="3" name="oblique_position" type="Vector3" />
+			<param index="4" name="oblique_offset" type="float" />
+			<description>
+				Sets the camera to use oblique near plane frustum culling.
+			</description>
+		</method>
 		<method name="camera_set_transform">
 			<return type="void" />
 			<param index="0" name="camera" type="RID" />

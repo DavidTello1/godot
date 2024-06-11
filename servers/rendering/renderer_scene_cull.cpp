@@ -89,6 +89,17 @@ void RendererSceneCull::camera_set_frustum(RID p_camera, float p_size, Vector2 p
 	camera->zfar = p_z_far;
 }
 
+void RendererSceneCull::camera_set_oblique_plane(RID p_camera, bool p_use_oblique_frustum, const Vector3 &p_ob_normal, const Vector3 &p_ob_position, float p_ob_offset) {
+	Camera *camera = camera_owner.get_or_null(p_camera);
+	ERR_FAIL_NULL(camera);
+	camera->use_oblique_frustum = p_use_oblique_frustum;
+	camera->oblique_normal = p_ob_normal;
+	camera->oblique_position = p_ob_position;
+	camera->oblique_offset = p_ob_offset;
+}
+
+
+
 void RendererSceneCull::camera_set_transform(RID p_camera, const Transform3D &p_transform) {
 	Camera *camera = camera_owner.get_or_null(p_camera);
 	ERR_FAIL_NULL(camera);
@@ -122,6 +133,18 @@ void RendererSceneCull::camera_set_use_vertical_aspect(RID p_camera, bool p_enab
 
 bool RendererSceneCull::is_camera(RID p_camera) const {
 	return camera_owner.owns(p_camera);
+}
+
+Vector4 RendererSceneCull::get_camera_oblique_plane(RID p_camera) {
+	Camera *camera = camera_owner.get_or_null(p_camera);
+	ERR_FAIL_NULL_V(camera, Vector4());
+
+	int dot = int(camera->oblique_normal.dot(camera->oblique_position - camera->transform.origin) >= 0.0f ? 1.0f : -1.0f);
+	Vector3 cam_space_pos = camera->transform.xform_inv(camera->oblique_position);
+	Vector3 cam_space_normal = camera->transform.basis.xform_inv(camera->oblique_normal) * dot;
+	real_t cam_space_dst = -cam_space_pos.dot(cam_space_normal) + camera->oblique_offset;
+
+	return Vector4(cam_space_normal.x, cam_space_normal.y, cam_space_normal.z, cam_space_dst);
 }
 
 /* OCCLUDER API */
@@ -2543,6 +2566,7 @@ void RendererSceneCull::render_camera(const Ref<RenderSceneBuffers> &p_render_bu
 		// Normal camera
 		Transform3D transform = camera->transform;
 		Projection projection;
+		Projection oblique_projection;
 		bool vaspect = camera->vaspect;
 		bool is_orthogonal = false;
 
@@ -2576,7 +2600,11 @@ void RendererSceneCull::render_camera(const Ref<RenderSceneBuffers> &p_render_bu
 			} break;
 		}
 
-		camera_data.set_camera(transform, projection, is_orthogonal, vaspect, jitter, camera->visible_layers);
+		oblique_projection = main_projection;
+		if (camera->use_oblique_frustum) {
+			oblique_projection.apply_oblique_plane(get_camera_oblique_plane(p_camera));
+		}
+		camera_data.set_camera(transform, main_projection, oblique_projection, is_orthogonal, vaspect, jitter, camera->visible_layers);
 	} else {
 		// Setup our camera for our XR interface.
 		// We can support multiple views here each with their own camera
@@ -2598,7 +2626,7 @@ void RendererSceneCull::render_camera(const Ref<RenderSceneBuffers> &p_render_bu
 		}
 
 		if (view_count == 1) {
-			camera_data.set_camera(transforms[0], projections[0], false, camera->vaspect, jitter, camera->visible_layers);
+			camera_data.set_camera(transforms[0], projections[0], projections[0], false, camera->vaspect, jitter, camera->visible_layers);
 		} else if (view_count == 2) {
 			camera_data.set_multiview_camera(view_count, transforms, projections, false, camera->vaspect);
 		} else {
@@ -3389,7 +3417,7 @@ void RendererSceneCull::render_empty_scene(const Ref<RenderSceneBuffers> &p_rend
 	RENDER_TIMESTAMP("Render Empty 3D Scene");
 
 	RendererSceneRender::CameraData camera_data;
-	camera_data.set_camera(Transform3D(), Projection(), true, false);
+	camera_data.set_camera(Transform3D(), Projection(), Projection(), false, false);
 
 	scene_render->render_scene(p_render_buffers, &camera_data, &camera_data, PagedArray<RenderGeometryInstance *>(), PagedArray<RID>(), PagedArray<RID>(), PagedArray<RID>(), PagedArray<RID>(), PagedArray<RID>(), PagedArray<RID>(), environment, RID(), p_shadow_atlas, RID(), scenario->reflection_atlas, RID(), 0, 0, nullptr, 0, nullptr, 0, nullptr);
 #endif
@@ -3462,7 +3490,7 @@ bool RendererSceneCull::_render_reflection_probe_step(Instance *p_instance, int 
 
 		RENDER_TIMESTAMP("Render ReflectionProbe, Step " + itos(p_step));
 		RendererSceneRender::CameraData camera_data;
-		camera_data.set_camera(xform, cm, false, false);
+		camera_data.set_camera(xform, cm, cm, false, false);
 
 		Ref<RenderSceneBuffers> render_buffers = RSG::light_storage->reflection_probe_atlas_get_render_buffers(scenario->reflection_atlas);
 		_render_scene(&camera_data, render_buffers, environment, RID(), RSG::light_storage->reflection_probe_get_cull_mask(p_instance->base), p_instance->scenario->self, RID(), shadow_atlas, reflection_probe->instance, p_step, mesh_lod_threshold, use_shadows);
