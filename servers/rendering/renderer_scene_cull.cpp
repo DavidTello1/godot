@@ -2565,14 +2565,14 @@ void RendererSceneCull::render_camera(const Ref<RenderSceneBuffers> &p_render_bu
 	if (p_xr_interface.is_null()) {
 		// Normal camera
 		Transform3D transform = camera->transform;
-		Projection projection;
+		Projection main_projection;
 		Projection oblique_projection;
 		bool vaspect = camera->vaspect;
 		bool is_orthogonal = false;
 
 		switch (camera->type) {
 			case Camera::ORTHOGONAL: {
-				projection.set_orthogonal(
+				main_projection.set_orthogonal(
 						camera->size,
 						p_viewport_size.width / (float)p_viewport_size.height,
 						camera->znear,
@@ -2581,7 +2581,7 @@ void RendererSceneCull::render_camera(const Ref<RenderSceneBuffers> &p_render_bu
 				is_orthogonal = true;
 			} break;
 			case Camera::PERSPECTIVE: {
-				projection.set_perspective(
+				main_projection.set_perspective(
 						camera->fov,
 						p_viewport_size.width / (float)p_viewport_size.height,
 						camera->znear,
@@ -2590,7 +2590,7 @@ void RendererSceneCull::render_camera(const Ref<RenderSceneBuffers> &p_render_bu
 
 			} break;
 			case Camera::FRUSTUM: {
-				projection.set_frustum(
+				main_projection.set_frustum(
 						camera->size,
 						p_viewport_size.width / (float)p_viewport_size.height,
 						camera->offset,
@@ -3357,6 +3357,7 @@ void RendererSceneCull::_render_scene(const RendererSceneRender::CameraData *p_c
 	} else {
 		camera_attributes = scenario->camera_attributes;
 	}
+
 	/* PROCESS GEOMETRY AND DRAW SCENE */
 
 	RID occluders_tex;
